@@ -174,5 +174,5 @@ ORDER BY Timestamp;
 [easy_triage_fbsd.sh by Maxim Suhanov](https://github.com/msuhanov/easy_triage/blob/main/easy_triage_fbsd.sh)  
 [ctx697096_check.sh by Thomas Poppelgaard](https://github.com/ThomasPoppelgaard/netscaler-ctx697096-checker)  
 [netscaler-ioc-check.sh by Manuel Winkel](https://github.com/Deyda/Security/blob/main/deyda-netscaler-ioc-check.sh)  
-[CVE-2026-88771 through CVE-2026-88778, what you should know and how to fix your NetScaler ADC, NetScaler Gateway](https://www.poppelgaard.com/cve-2026-88771-through-cve-2026-88778-what-you-should-know-and-how-to-fix-your-netscaler-adc-netscaler-gateway)  
+[CVE-2026-88771 through CVE-2026-88778, what you should know and how to fix your NetScaler](https://www.poppelgaard.com/cve-2026-88771-through-cve-2026-88778-what-you-should-know-and-how-to-fix-your-netscaler-adc-netscaler-gateway)  
 [NetScaler CVE Checklist: Updates, Security Assessment and Incident Response](https://www.deyda.net/index.php/en/2026/08/28/netscaler-cve-checklist-updates-security-assessment-and-incident-response/)  
