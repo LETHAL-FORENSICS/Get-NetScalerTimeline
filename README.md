@@ -173,6 +173,8 @@ WHERE Timestamp >= TIMESTAMP '2026-09-01 00:00:00'
 ORDER BY Timestamp;
 ```
 
+More threat hunting queries: [Queries.md](Queries.md)
+
 ## Notes and Limitations
 
 * **Disk image only:** The root file system of a NetScaler (e.g. `/etc`, `/netscaler`) is a RAM disk that is rebuilt at every boot and is **not** part of the VMDK. Only the persistent file systems `/flash` and `/var` are analyzed. Web shells under `/netscaler/ns_gui` or a modified `/etc/httpd.conf` must be collected from the live system.
