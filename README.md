@@ -2,7 +2,7 @@
 
 Automated File System Timeline Creation for NetScaler ADC/Gateway (DFIR)
 
-Get-NetScalerTimeline.ps1 is a PowerShell script utilized to simplify the creation of a File System Timeline of a NetScaler VMDK Disk Image (UFS). The results are imported into [DuckDB](https://duckdb.org/) for fast threat hunting with SQL including the persistent locations used by web shells and the log poisoning technique of CVE-2026-88771.
+Get-NetScalerTimeline.ps1 is a PowerShell script utilized to simplify the creation of a File System Timeline of a NetScaler VMDK Disk Image (UFS). The results are imported into [DuckDB](https://duckdb.org/) for fast threat hunting with SQL, including the persistent locations used by web shells and the log poisoning technique of CVE-2026-88771.
 
 <!-- Screenshot 01 -->
 <!-- Screenshot 02 -->
@@ -10,16 +10,16 @@ Get-NetScalerTimeline.ps1 is a PowerShell script utilized to simplify the creati
 
 ## Features
 
-* **Automatic Partition Detection** — Detects the FreeBSD Slice (0xa5) and all UFS partitions in its BSD Disk Label (e.g. `/flash` and `/var`), incl. their mount points
-* **VMDK Support** — Flat extent (`*-flat.vmdk`) or descriptor file (`*.vmdk`) of a flat/VMFS disk, incl. split images (multiple extents)
-* **File System Timeline** — Bodyfile (fls) and timeline (mactime) in UTC, ISO 8601, as CSV and XLSX
-* **DuckDB Database** — Bodyfile import with file type, status (allocated/deleted), orphan files, symbolic link targets and human-readable timestamps (UTC)
-* **Log Extraction** — Extracts `ns.log`, `httpaccess*.log` and `httperror*.log` (incl. rotated `.gz` archives) directly from the image, byte-for-byte, with SHA256 hashes of the evidence copies
-* **Log Poisoning Detection (CVE-2026-88771)** — Searches the extracted logs for fake `pitboss` heartbeat messages followed by shell operators
-* **Log Coverage** — Reports how far back the local logs go, because NetScaler rotates its logs quickly
-* **File Hashing (optional)** — MD5 and SHA256 of all allocated regular files, read directly from the image and hashed in memory (no files are extracted)
-* **Robust Handling of Evidence Data** — Native tool output is written byte-for-byte (no re-encoding by PowerShell), non-UTF-8 file names are preserved, pipe characters in file names are handled
-* **DuckDB UI** — Launches the DuckDB UI (interactive notebooks) at the end of the analysis
+* **Automatic Partition Detection:** Detects the FreeBSD Slice (0xa5) and all UFS partitions in its BSD Disk Label (e.g. `/flash` and `/var`), incl. their mount points
+* **VMDK Support:** Flat extent (`*-flat.vmdk`) or descriptor file (`*.vmdk`) of a flat/VMFS disk, incl. split images (multiple extents)
+* **File System Timeline:** Bodyfile (fls) and timeline (mactime) in UTC, ISO 8601, as CSV and XLSX
+* **DuckDB Database:** Bodyfile import with file type, status (allocated/deleted), orphan files, symbolic link targets and human-readable timestamps (UTC)
+* **Log Extraction:** Extracts `ns.log`, `httpaccess*.log` and `httperror*.log` (incl. rotated `.gz` archives) directly from the image, byte-for-byte, with SHA256 hashes of the evidence copies
+* **Log Poisoning Detection (CVE-2026-88771):** Searches the extracted logs for fake `pitboss` heartbeat messages followed by shell operators
+* **Log Coverage:** Reports how far back the local logs go, because NetScaler rotates its logs quickly
+* **File Hashing (optional):** MD5 and SHA256 of all allocated regular files, read directly from the image and hashed in memory (no files are extracted)
+* **Robust Handling of Evidence Data:** Native tool output is written byte-for-byte (no re-encoding by PowerShell), non-UTF-8 file names are preserved, pipe characters in file names are handled
+* **DuckDB UI:** Launches the DuckDB UI (interactive notebooks) at the end of the analysis
 
 ## Requirements
 
