@@ -177,7 +177,7 @@ ORDER BY Timestamp;
 **Fig 7:** DuckDB UI: Crash Dumps (Exploitation Traces)  
 
 > [!TIP]
-> More threat hunting queries (web shells, persistence, crash dumps, log tampering, CVE-2026-88771/88772 IOCs) can be found in [Queries.md](Queries.md).
+> More threat hunting queries (web shells, persistence, crash dumps, log tampering, CVE-2026-88771/88772 IOCs) can be found in [Queries.md](Queries.md). Happy Hunting!
 
 ## Notes and Limitations
 
