@@ -162,9 +162,9 @@ ORDER BY Timestamp;
 ## Notes and Limitations
 
 * **Disk image only:** The root file system of a NetScaler (e.g. `/etc`, `/netscaler`) is a RAM disk that is rebuilt at every boot and is **not** part of the VMDK. Only the persistent file systems `/flash` and `/var` are analyzed. Web shells under `/netscaler/ns_gui` or a modified `/etc/httpd.conf` must be collected from the live system.
-* **No birth time:** TSK 4.14 does not parse the UFS2 birth time, so `CreationTime` is always empty. Use `LastChangeTime` (ctime) for sorting — unlike mtime and atime, it cannot be set from user space (e.g. `touch`).
+* **No birth time:** TSK 4.14 does not parse the UFS2 birth time, so `CreationTime` is always empty. Use `LastChangeTime` (ctime) for sorting. Unlike mtime and atime, it cannot be set from user space (e.g. `touch`).
 * **Apache restarts update timestamps:** At every Apache start, NetScaler touches files under `/var/netscaler/logon/` that are older than 34 days. Clusters of identical timestamps there are expected.
-* **Log retention:** NetScaler rotates its logs quickly. "No suspicious lines found" only refers to the reported log coverage — older events may only be available in SIEM/Syslog.
+* **Log retention:** NetScaler rotates its logs quickly. "No suspicious lines found" only refers to the reported log coverage. Older events may only be available in SIEM/Syslog.
 * **Sparse VMDKs** (e.g. `monolithicSparse`, `streamOptimized`) are not supported. Convert them to RAW first (e.g. `qemu-img convert -O raw`).
 * **Snapshots:** If the descriptor references a parent disk (delta disk), only the delta is analyzed.
 * **Deleted files** are listed in the timeline, but not hashed or extracted, because their data blocks may already be reallocated. 
