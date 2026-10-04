@@ -5,6 +5,7 @@ Automated File System Timeline Creation for NetScaler ADC/Gateway (DFIR)
 Get-NetScalerTimeline.ps1 is a PowerShell script utilized to simplify the creation of a File System Timeline of a NetScaler VMDK Disk Image (UFS). The results are imported into [DuckDB](https://duckdb.org/) for fast threat hunting with SQL, including the persistent locations used by web shells and the log poisoning technique of CVE-2026-88771.
 
 ![Get-NetScalerTimeline](Screenshots/01.png)
+**Fig 1:** Get-NetScalerTimeline
 
 ## Features
 
@@ -78,13 +79,13 @@ Get-NetScalerTimeline\
 ```
 
 ![Get-NetScalerTimeline](Screenshots/02.png)
-**Fig 1:** MD5 and SHA256 File Hashing of all allocated regular files
+**Fig 2:** MD5 and SHA256 File Hashing of all allocated regular files
 
 ![DuckDB-UI](Screenshots/03.png)
-**Fig 2:** DuckDB UI is launched at the end of the analysis
+**Fig 3:** DuckDB UI is launched at the end of the analysis
 
-![Message-Box](Screenshots/03.png)
-**Fig 3:** Message Box
+![Message-Box](Screenshots/04.png)
+**Fig 4:** Message Box
 
 ## Usage
 
