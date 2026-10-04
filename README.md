@@ -48,7 +48,7 @@ Tested on Windows 11 Pro (x64) with Windows PowerShell 5.1 and PowerShell 7.6.6.
 ## Installation
 
 1. Download or clone this repository, e.g. to `C:\Tools\Get-NetScalerTimeline`.
-2. Install **The Sleuth Kit** to `C:\Tools\sleuthkit`. The script expects the binaries in `C:\Tools\sleuthkit\bin` (`fls.exe`, `fsstat.exe`, `icat.exe`, `mmls.exe`, `mactime.pl`).
+2. Download and copy **The Sleuth Kit** to `C:\Tools\sleuthkit`. The script expects the binaries in `C:\Tools\sleuthkit\bin` (`fls.exe`, `fsstat.exe`, `icat.exe`, `mmls.exe`, `mactime.pl`).
 
    > **Note:** The TSK binaries for Windows are not standalone. Always keep the complete `bin` folder incl. all DLLs, otherwise the tools fail to start.
 
