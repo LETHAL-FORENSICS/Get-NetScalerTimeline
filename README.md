@@ -173,7 +173,11 @@ WHERE Timestamp >= TIMESTAMP '2026-09-01 00:00:00'
 ORDER BY Timestamp;
 ```
 
-More threat hunting queries: [Queries.md](Queries.md)
+![Threat-Hunting](Screenshots/07.png)  
+**Fig 7:** DuckDB UI: Crash Dumps (Exploitation Traces)  
+
+> [!TIP]
+> More threat hunting queries (web shells, persistence, crash dumps, log tampering, CVE-2026-88771/88772 IOCs) can be found in [Queries.md](Queries.md).
 
 ## Notes and Limitations
 
