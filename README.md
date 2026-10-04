@@ -179,6 +179,20 @@ ORDER BY Timestamp;
 > [!TIP]
 > More threat hunting queries (web shells, persistence, crash dumps, log tampering, CVE-2026-88771/88772 IOCs) can be found in [Queries.md](Queries.md). Happy Hunting!
 
+## Contributing
+
+Contributions are welcome, especially threat hunting queries from the DFIR community.  
+
+To share a query:
+
+1. Create a `.sql` file with the same header as the existing queries:
+
+   ```sql
+   -- Title: <Short, descriptive title>
+   -- Description: <What the query shows, why it matters, how to read the results>
+   -- Id: <GUID, e.g. (New-Guid).Guid in PowerShell>
+   -- Author: <Your name>
+   -- Date: <yyyy-MM-dd>
 ## Notes and Limitations
 
 * **Disk image only:** The root file system of a NetScaler (e.g. `/etc`, `/netscaler`) is a RAM disk that is rebuilt at every boot and is **not** part of the VMDK. Only the persistent file systems `/flash` and `/var` are analyzed. Web shells under `/netscaler/ns_gui` or a modified `/etc/httpd.conf` must be collected from the live system.
