@@ -127,6 +127,12 @@ Limit the timeline (CSV/XLSX) to a date range:
 
 > **Note:** `-StartDate`/`-EndDate` only limit the mactime timeline (CSV/XLSX). The DuckDB database always contains the complete bodyfile.
 
+![File-Dialog](Screenshots/05.png)  
+**Fig 5:** File Dialog Browser (Interactive Mode)   
+
+![File-Hashing](Screenshots/06.png)  
+**Fig 6:** The script asks whether to calculate MD5 and SHA256 hashes (Interactive Mode)  
+
 ## Output
 
 ```
