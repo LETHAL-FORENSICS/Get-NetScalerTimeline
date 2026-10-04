@@ -77,6 +77,15 @@ Get-NetScalerTimeline\
         └── duckdb.exe
 ```
 
+![Get-NetScalerTimeline](Screenshots/02.png)
+**Fig 1:** MD5 and SHA256 File Hashing of all allocated regular files
+
+![DuckDB-UI](Screenshots/03.png)
+**Fig 2:** DuckDB UI is launched at the end of the analysis
+
+![Message-Box](Screenshots/03.png)
+**Fig 3:** Message Box
+
 ## Usage
 
 Run the script in an elevated PowerShell session.
