@@ -4,7 +4,7 @@
 # @copyright: Copyright (c) 2026 Martin Willing. Licensed under the MIT license.
 # @contact:   Any feedback or suggestions are always welcome and much appreciated - mwilling@lethal-forensics.com
 # @url:       https://lethal-forensics.com/
-# @date:      2026-10-04
+# @date:      2026-11-23
 #
 #
 # ██╗     ███████╗████████╗██╗  ██╗ █████╗ ██╗      ███████╗ ██████╗ ██████╗ ███████╗███╗   ██╗███████╗██╗ ██████╗███████╗
@@ -17,7 +17,7 @@
 #
 # Dependencies:
 #
-# DuckDB CLI v1.5.6 (2026-09-28)
+# DuckDB CLI v2.0.0 (2026-10-21)
 # https://duckdb.org/install/?platform=windows&environment=cli
 #
 # The Sleuth Kit v4.14.0 (2025-04-15)
@@ -31,13 +31,24 @@
 #
 #
 # Changelog:
+#
+# Version 0.2
+# Release Date: 2026-11-23
+# Added: Support for RAW file system images without partition table (e.g. NetScaler RAM disk /dev/md0)
+# Added: Warning if the image size is not a multiple of 512 bytes (e.g. SSH banner bytes in a dd image acquired via SSH)
+# Added: DuckDB UI extension check before launching the DuckDB UI
+# Fixed: UFS2 Creation Time (crtime) is not available (0) --> undated mactime rows (0000-00-00) w/ Type '...b' are removed from CSV/XLSX
+# Fixed: Export-Csv parameter -NoTypeInformation is only used in Windows PowerShell 5.1 (obsolete in PowerShell 7.6)
+# Fixed: Timestamped output subdirectory (UTC) per run --> previous results are no longer deleted
+# Changed: DuckDB CLI v2.0.0
+#
 # Version 0.1
 # Release Date: 2026-10-04
 # Initial Release
 #
 #
-# Tested on Windows 11 Pro (x64) Version 26H2 (10.0.26300.9457) and PowerShell 5.1.26100.9444
-# Tested on Windows 11 Pro (x64) Version 26H2 (10.0.26300.9457) and PowerShell 7.6.6
+# Tested on Windows 11 Pro (x64) Version 26H2 (10.0.26300.9974) and PowerShell 5.1.26100.9818
+# Tested on Windows 11 Pro (x64) Version 26H2 (10.0.26300.9974) and PowerShell 7.7.0
 #
 #
 #############################################################################################################################################################################################
@@ -45,26 +56,29 @@
 
 <#
 .SYNOPSIS
-  Get-NetScalerTimeline v0.1 - Automated File System Timeline Creation for NetScaler ADC/Gateway (DFIR)
+  Get-NetScalerTimeline v0.2 - Automated File System Timeline Creation for NetScaler ADC/Gateway (DFIR)
 
 .DESCRIPTION
-  Get-NetScalerTimeline.ps1 is a PowerShell script utilized to simplify the creation of a File System Timeline of a NetScaler VMDK Disk Image (UFS).
+  Get-NetScalerTimeline.ps1 is a PowerShell script utilized to simplify the creation of a File System Timeline of a NetScaler VMDK Disk Image or RAW File System Image (UFS).
 
   Timeline Analysis is a digital forensics process that extracts file metadata and sorts time-based events in chronological order to reconstruct a security incident.
 
   The FreeBSD Slice (0xa5) and all UFS partitions in its BSD Disk Label (e.g. /flash and /var) are detected automatically.
 
+  RAW file system images without partition table (e.g. a dd image of the NetScaler RAM disk /dev/md0 incl. /etc and /netscaler) are detected automatically as well.
+
   The NetScaler logs (ns.log, httpaccess*.log, httperror*.log) are extracted and checked for log poisoning (CVE-2026-88771).
 
   Optionally, MD5 and SHA256 file hashes can be calculated for IOC matching (e.g. VirusTotal, Threat Intelligence Reports).
 
-.PARAMETER OutputDir
-  Specifies the output directory. Default is "$env:USERPROFILE\Desktop\Get-NetScalerTimeline".
-
-  Note: The subdirectory 'Get-NetScalerTimeline' is automatically created.
-
 .PARAMETER Path
-  Optional. Specifies the path to the VMDK. Either the flat extent (*-flat.vmdk) or the descriptor file (*.vmdk) of a flat/VMFS disk. If omitted, a file dialog opens.
+  Optional. Specifies the path to the disk image. Either the flat extent (*-flat.vmdk) or the descriptor file (*.vmdk) of a flat/VMFS disk, or a RAW image (*.img, *.raw, *.dd, *.bin), e.g. of the NetScaler RAM disk /dev/md0. If omitted, a file dialog opens.
+
+.PARAMETER OutputDir
+  Optional. Specifies the output directory. Default is "$env:USERPROFILE\Desktop".
+
+  Note: For each run, a timestamped subdirectory (UTC) is automatically created, so previous results are never overwritten:
+  <OutputDir>\Get-NetScalerTimeline\<yyyy-MM-ddTHHmmssZ>, e.g. "$env:USERPROFILE\Desktop\Get-NetScalerTimeline\2026-11-22T134029Z"
 
 .PARAMETER Hash
   Optional. Calculates the MD5 and SHA256 hashes of all allocated regular files and adds them to DuckDB (table NetScaler, columns MD5 and SHA256).
@@ -74,22 +88,32 @@
   Note: Each file is read by a separate icat process. This can take 15-20 minutes for a typical NetScaler disk image.
 
 .PARAMETER StartDate
-  Optional. Only include events on or after this date (yyyy-MM-dd, UTC).
+  Optional. Only include events on or after this date in the CSV/XLSX timeline (yyyy-MM-dd, UTC). The DuckDB database always contains all events.
 
 .PARAMETER EndDate
-  Optional. Only include events on or before this date (yyyy-MM-dd, UTC).
+  Optional. Only include events on or before this date in the CSV/XLSX timeline (yyyy-MM-dd, UTC). The DuckDB database always contains all events.
 
 .EXAMPLE
   PS> .\Get-NetScalerTimeline.ps1
 
 .EXAMPLE
-  PS> .\Get-NetScalerTimeline.ps1 -Path "$env:USERPROFILE\Desktop\NetScaler\VMDK\NetScaler-flat.vmdk"
+  PS> .\Get-NetScalerTimeline.ps1 -Path "$env:USERPROFILE\Desktop\NetScaler\VMDK\NetScaler.vmdk"
+
+  VMDK descriptor file: the flat extent referenced in the descriptor (e.g. NetScaler-flat.vmdk) must be located in the same directory.
+
+.EXAMPLE
+  PS> .\Get-NetScalerTimeline.ps1 -Path "$env:USERPROFILE\Desktop\NetScaler\VMDK\NetScaler-flat.vmdk" -OutputDir "D:\Cases\IR-001"
+
+  Results are written to D:\Cases\IR-001\Get-NetScalerTimeline\<yyyy-MM-ddTHHmmssZ>.
 
 .EXAMPLE
   PS> .\Get-NetScalerTimeline.ps1 -Path "$env:USERPROFILE\Desktop\NetScaler\VMDK\NetScaler-flat.vmdk" -Hash
 
 .EXAMPLE
   PS> .\Get-NetScalerTimeline.ps1 -Path "$env:USERPROFILE\Desktop\NetScaler\VMDK\NetScaler-flat.vmdk" -StartDate 2026-09-01 -EndDate 2026-10-01
+
+.EXAMPLE
+  PS> .\Get-NetScalerTimeline.ps1 -Path "$env:USERPROFILE\Desktop\NetScaler\RAW\NetScaler-md0.img" -Hash
 
 .NOTES
   Author - Martin Willing
@@ -144,10 +168,13 @@ else
     $SCRIPT_DIR = Split-Path -Parent $MyInvocation.MyCommand.Definition
 }
 
+# Timestamp (UTC)
+$Timestamp = [datetime]::UtcNow.ToString("yyyy-MM-dd'T'HHmmss'Z'")
+
 # Output Directory
 if (!($OutputDir))
 {
-    $script:OUTPUT_FOLDER = "$env:USERPROFILE\Desktop\Get-NetScalerTimeline" # Default
+    $script:OUTPUT_FOLDER = "$env:USERPROFILE\Desktop\Get-NetScalerTimeline\$Timestamp" # Default
 }
 else
 {
@@ -158,7 +185,7 @@ else
     }
     else
     {
-        $script:OUTPUT_FOLDER = "$OutputDir\Get-NetScalerTimeline" # Custom
+        $script:OUTPUT_FOLDER = "$OutputDir\Get-NetScalerTimeline\$Timestamp" # Custom
     }
 }
 
@@ -211,6 +238,13 @@ else
     # Excel - Color Scheme
     $script:BackgroundColor = [System.Drawing.Color]$Config.ImportExcel.BackgroundColor
     $script:FontColor       = $Config.ImportExcel.FontColor
+}
+
+# Export-Csv: -NoTypeInformation is the default in PowerShell 6+ and marked as obsolete in PowerShell 7.6 --> only pass it in Windows PowerShell 5.1
+$script:CsvParams = @{}
+if ($PSVersionTable.PSVersion.Major -lt 6)
+{
+    $script:CsvParams["NoTypeInformation"] = $true
 }
 
 # Invoke-TSK - Runs a native tool and writes its stdout byte-for-byte to a file.
@@ -338,7 +372,7 @@ Function Get-LineCount($File)
 
 # Windows Title
 $DefaultWindowsTitle = $Host.UI.RawUI.WindowTitle
-$Host.UI.RawUI.WindowTitle = "Get-NetScalerTimeline v0.1 - Automated File System Timeline Creation for NetScaler ADC/Gateway (DFIR)"
+$Host.UI.RawUI.WindowTitle = "Get-NetScalerTimeline v0.2 - Automated File System Timeline Creation for NetScaler ADC/Gateway (DFIR)"
 
 # Check if the PowerShell script is being run with admin rights
 if (!([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator))
@@ -416,14 +450,14 @@ if (!(Get-Module -ListAvailable -Name ImportExcel))
 # Add the required MessageBox class (Windows PowerShell)
 Add-Type -AssemblyName System.Windows.Forms
 
-# Select VMDK Disk Image (RAW)
+# Select Disk Image (VMDK or RAW)
 if(!($Path))
 {
     Function Get-DiskImage($InitialDirectory)
     {
         $OpenFileDialog = New-Object System.Windows.Forms.OpenFileDialog
         $OpenFileDialog.InitialDirectory = $InitialDirectory
-        $OpenFileDialog.Filter = "Virtual Machine Disk|*.vmdk|All Files (*.*)|*.*"
+        $OpenFileDialog.Filter = "Disk Images (*.vmdk;*.img;*.raw;*.dd;*.bin)|*.vmdk;*.img;*.raw;*.dd;*.bin|All Files (*.*)|*.*"
         $OpenFileDialog.Multiselect = $false
         if ($OpenFileDialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK)
         {
@@ -463,16 +497,8 @@ if (!($Path) -and !($Hash))
     }
 }
 
-# Flush Output Directory
-if (Test-Path "$OUTPUT_FOLDER")
-{
-    Get-ChildItem -Path "$OUTPUT_FOLDER" -Force -Recurse -ErrorAction SilentlyContinue | Remove-Item -Force -Recurse
-    New-Item "$OUTPUT_FOLDER" -ItemType Directory -Force | Out-Null
-}
-else 
-{
-    New-Item "$OUTPUT_FOLDER" -ItemType Directory -Force | Out-Null
-}
+# Create Output Directory
+New-Item "$OUTPUT_FOLDER" -ItemType Directory -Force | Out-Null
 
 # Create a record of your PowerShell session to a text file
 Start-Transcript -Path "$OUTPUT_FOLDER\Transcript.txt"
@@ -495,7 +521,7 @@ Write-Output "$Logo"
 Write-Output ""
 
 # Header
-Write-Output "Get-NetScalerTimeline v0.1 - Automated File System Timeline Creation for NetScaler ADC/Gateway (DFIR)"
+Write-Output "Get-NetScalerTimeline v0.2 - Automated File System Timeline Creation for NetScaler ADC/Gateway (DFIR)"
 Write-Output "(c) 2026 Martin Willing at Lethal-Forensics (https://lethal-forensics.com/)"
 Write-Output ""
 
@@ -528,17 +554,18 @@ if (!(Test-Path -LiteralPath "$DiskImage" -PathType Leaf))
 }
 
 # Check File Extension
-$Extension = [IO.Path]::GetExtension($DiskImage)
-if (!($Extension -eq ".vmdk" ))
+# Supported: VMDK (flat extent or descriptor file) and RAW images (e.g. dd image of the NetScaler RAM disk /dev/md0)
+$Extension = [IO.Path]::GetExtension($DiskImage).ToLower()
+if ($Extension -notin @(".vmdk", ".img", ".raw", ".dd", ".bin"))
 {
-    Stop-Analysis "No VMDK Disk Image provided."
+    Stop-Analysis "Unsupported file type ($Extension). Supported: .vmdk, .img, .raw, .dd, .bin"
 }
 
 # Descriptor File (.vmdk) vs. Flat Extent (*-flat.vmdk)
 # Note: The Descriptor File is a small text file (~1KB) starting with '# Disk DescriptorFile' that references the extent(s) holding the actual data.
 $DiskImageItem = Get-Item -LiteralPath "$DiskImage"
 $IsDescriptor = $false
-if ($DiskImageItem.Length -lt 1MB)
+if ($Extension -eq ".vmdk" -and $DiskImageItem.Length -lt 1MB)
 {
     $FirstLine = Get-Content -LiteralPath "$DiskImage" -TotalCount 1 -ErrorAction SilentlyContinue
     if ($FirstLine -match '^# Disk DescriptorFile')
@@ -610,6 +637,14 @@ if ($ImageFiles.Count -gt 1)
 $InputSize = Get-FileSize(($ImageFiles | ForEach-Object { (Get-Item -LiteralPath $_).Length } | Measure-Object -Sum).Sum)
 Write-Output "[Info]  Total Input Size: $InputSize"
 
+# Sanity Check: Disk images are a multiple of 512 bytes
+# A dd image acquired via SSH (e.g. 'ssh nsroot@<IP> shell dd if=/dev/md0') may contain additional bytes of the SSH session (e.g. 6 bytes) at the beginning and/or end
+$TotalBytes = ($ImageFiles | ForEach-Object { (Get-Item -LiteralPath $_).Length } | Measure-Object -Sum).Sum
+if ($TotalBytes % 512 -ne 0)
+{
+    Write-Host "[Alert] Image size is not a multiple of 512 bytes ($('{0:N0}' -f ($TotalBytes % 512)) extra bytes). Check for SSH banner bytes at the beginning/end of the image (e.g. tail -c +7 | head -c -6)." -ForegroundColor Yellow
+}
+
 # Common TSK Arguments (RAW image, split extents are passed in order)
 $ImageArgs  = @("-i", "raw")
 $TargetArgs = $ImageFiles
@@ -639,10 +674,11 @@ Invoke-TSK -FilePath $mmls -ArgumentList ($ImageArgs + @("-a") + $TargetArgs) -O
 #       Slot      Start        End          Length       Description
 # 002:  000:000   0000000063   0041943005   0041942943   BSD/386, 386BSD, NetBSD, FreeBSD (0xa5)
 
-# Cannot determine partition type
+# No partition table --> File System Image (e.g. NetScaler RAM disk /dev/md0)?
+$IsFsImage = $false
 if (!(Test-Path "$OUTPUT_FOLDER\mmls\mmls-all.txt") -or (Get-Item "$OUTPUT_FOLDER\mmls\mmls-all.txt").Length -eq 0)
 {
-    Stop-Analysis "Cannot determine partition type."
+    $IsFsImage = $true
 }
 
 # Check for FreeBSD Slice (0xa5) and get its Start Sector
@@ -655,7 +691,7 @@ foreach ($Line in Get-Content "$OUTPUT_FOLDER\mmls\mmls-allocated.txt")
     }
 }
 
-if ($Slices.Count -eq 0)
+if ($Slices.Count -eq 0 -and !($IsFsImage))
 {
     Stop-Analysis "No FreeBSD Slice (0xa5) found."
 }
@@ -679,6 +715,35 @@ if ($Slices.Count -eq 0)
 
 New-Item "$OUTPUT_FOLDER\fsstat" -ItemType Directory -Force | Out-Null
 $FileSystems = @()
+
+# File System Image (no partition table): UFS directly at offset 0 (e.g. NetScaler RAM disk /dev/md0)
+if ($IsFsImage)
+{
+    $FsstatFile = "$OUTPUT_FOLDER\fsstat\fsstat-0.txt"
+    Invoke-TSK -FilePath $fsstat -ArgumentList ($ImageArgs + @("-o", "0") + $TargetArgs) -OutFile $FsstatFile | Out-Null
+    $FsstatOutput = Get-Content $FsstatFile -Raw
+
+    if ($FsstatOutput -match 'File System Type: (UFS \d)')
+    {
+        $FsType     = $Matches[1]
+        $MountPoint = if ($FsstatOutput -match 'Last Mount Point:[ \t]*(\S+)') { $Matches[1] } else { "/" }
+        $VolumeName = if ($FsstatOutput -match 'Volume Name:[ \t]*(\S+)') { $Matches[1] } else { "" }
+
+        Write-Output "[Info]  No partition table found --> File System Image: $FsType - $MountPoint (Offset: 0)"
+
+        $FileSystems += [PSCustomObject]@{
+            Letter     = "-"
+            Offset     = 0
+            Type       = $FsType
+            MountPoint = $MountPoint
+            VolumeName = $VolumeName
+        }
+    }
+    else
+    {
+        Stop-Analysis "Cannot determine partition type (no partition table and no UFS file system at offset 0)."
+    }
+}
 
 foreach ($SliceStart in $Slices)
 {
@@ -810,28 +875,70 @@ if (!(Test-Path "$Timeline") -or (Get-Item "$Timeline").Length -eq 0)
     Stop-Analysis "mactime failed. Check $OUTPUT_FOLDER\Timeline\2-mactime-timeline.err"
 }
 
-# Time Window of the Timeline (first/last event)
-# Entries w/o any timestamp (e.g. $OrphanFiles) are listed as 0000-00-00T00:00:00Z
-$Total   = 0
-$Undated = 0
-$First   = $null
-$Last    = $null
-foreach ($Line in [System.IO.File]::ReadLines($Timeline) | Select-Object -Skip 1)
+# Time Window of the Timeline (first/last event) + Removal of undated Creation Time rows
+# The UFS2 Creation Time (crtime) is not available in the bodyfile (0) --> mactime lists one extra row per file dated 0000-00-00T00:00:00Z w/ Type '...b'.
+# These rows carry no information (every file is still listed w/ its m/a/c timestamps) and are removed. Other undated rows (e.g. 'macb') are kept.
+# Note: Latin-1 reads/writes the bytes 1:1 --> non-UTF-8 file names are not altered.
+$Latin1   = [System.Text.Encoding]::GetEncoding(28591)
+$Filtered = "$Timeline.tmp"
+$Total    = 0
+$Removed  = 0
+$Undated  = 0
+$First    = $null
+$Last     = $null
+
+# Line Ending of mactime output (CRLF or LF)
+$Head = New-Object byte[] 4096
+$Fs   = [System.IO.File]::OpenRead($Timeline)
+try { $Read = $Fs.Read($Head, 0, $Head.Length) } finally { $Fs.Close() }
+$NewLine = if ($Latin1.GetString($Head, 0, $Read) -match "`r`n") { "`r`n" } else { "`n" }
+
+$Writer = New-Object System.IO.StreamWriter($Filtered, $false, $Latin1)
+$Writer.NewLine = $NewLine
+try
 {
-    $Total++
-    $Date = $Line.Substring(0, 20)
-    if ($Date -like "0000-00-00*")
+    $IsHeader = $true
+    foreach ($Line in [System.IO.File]::ReadLines($Timeline, $Latin1))
     {
-        $Undated++
-    }
-    else
-    {
-        if (!($First)) { $First = $Date }
-        $Last = $Date
+        if ($IsHeader)
+        {
+            $Writer.WriteLine($Line)
+            $IsHeader = $false
+            continue
+        }
+
+        if ($Line.StartsWith("0000-00-00"))
+        {
+            if ($Line -match '^0000-00-00T00:00:00Z,\d+,\.\.\.b,')
+            {
+                $Removed++
+                continue
+            }
+            $Undated++
+        }
+        else
+        {
+            $Date = $Line.Substring(0, 20)
+            if (!($First)) { $First = $Date }
+            $Last = $Date
+        }
+
+        $Total++
+        $Writer.WriteLine($Line)
     }
 }
+finally
+{
+    $Writer.Close()
+}
+Move-Item -LiteralPath $Filtered -Destination $Timeline -Force
 
 Write-Output "[Info]  $('{0:N0}' -f $Total) timeline entries"
+
+if ($Removed -gt 0)
+{
+    Write-Output "[Info]  Creation Time (crtime) not available --> $('{0:N0}' -f $Removed) undated '...b' rows removed"
+}
 
 if ($First)
 {
@@ -842,7 +949,7 @@ if ($First)
 
 if ($Undated -gt 0)
 {
-    Write-Output "[Info]  $('{0:N0}' -f $Undated) entries w/o timestamp (e.g. Orphan Files)"
+    Write-Output "[Info]  $('{0:N0}' -f $Undated) entries w/o timestamp"
 }
 
 # File Size (CSV)
@@ -962,7 +1069,7 @@ if ($Database -and (Test-Path "$Database") -and (Test-Path "$SCRIPT_DIR\Queries\
     }
 
     # Hashes of the extracted logs (evidence copies)
-    Get-ChildItem "$LogDir\raw" -File | Get-FileHash -Algorithm SHA256 | Select-Object @{n='File';e={Split-Path $_.Path -Leaf}}, Hash | Export-Csv "$LogDir\SHA256.csv" -NoTypeInformation
+    Get-ChildItem "$LogDir\raw" -File | Get-FileHash -Algorithm SHA256 | Select-Object @{n='File';e={Split-Path $_.Path -Leaf}}, Hash | Export-Csv "$LogDir\SHA256.csv" @CsvParams
     Write-Output "[Info]  $(@($LogFiles).Count) log file(s) extracted"
 
     # Import into DuckDB
@@ -1057,7 +1164,7 @@ if ($Hash -and $Database -and (Test-Path "$Database") -and (Test-Path "$SCRIPT_D
     Write-Progress -Activity "Calculating File Hashes" -Completed
 
     $HashFile = "$OUTPUT_FOLDER\Hashes\FileHashes.csv"
-    $Results | Export-Csv $HashFile -NoTypeInformation -Encoding UTF8
+    $Results | Export-Csv $HashFile -Encoding UTF8 @CsvParams
     if ($Errors -gt 0)
     {
         Write-Host "[Alert] $Errors file(s) could not be read by icat (MD5/SHA256 empty)" -ForegroundColor Yellow
@@ -1073,9 +1180,25 @@ if ($Hash -and $Database -and (Test-Path "$Database") -and (Test-Path "$SCRIPT_D
 }
 
 # Launching DuckDB UI (w/ Interactive Notebooks) --> http://localhost:4213/
+$UiLaunched = $false
 if ($Database -and (Test-Path "$Database"))
 {
-    Start-Process -FilePath "$DuckDB" -ArgumentList "-ui", "$Database" -WindowStyle Minimized
+    # DuckDB UI requires the 'ui' extension, which is downloaded from extensions.duckdb.org on first use
+    # (fails offline, or if the extension is not yet published for the bundled DuckDB version)
+    & $DuckDB -c "INSTALL ui;" 2>$null | Out-Null
+    $UiInstalled = & $DuckDB -noheader -csv -c "SELECT installed FROM duckdb_extensions() WHERE extension_name = 'ui';" 2>$null
+
+    if ("$UiInstalled".Trim() -eq "true")
+    {
+        Start-Process -FilePath "$DuckDB" -ArgumentList "-ui", "`"$Database`"" -WindowStyle Minimized
+        $UiLaunched = $true
+    }
+    else
+    {
+        $DuckDBVersion = (& $DuckDB --version 2>$null | Select-Object -Last 1) -replace '\s.*$', ''
+        Write-Host "[Alert] DuckDB UI extension is not available for DuckDB $DuckDBVersion (offline or not yet published) --> DuckDB UI not launched" -ForegroundColor Yellow
+        Write-Host "[Info]  Database: $Database"
+    }
 }
 
 #endregion Analysis
@@ -1102,7 +1225,15 @@ Stop-Transcript
 Start-Sleep 0.5
 
 # MessageBox UI
-$MessageBody = "Status: File System Timeline Creation completed.`n`nPress CTRL + D to shutdown DuckDB UI."
+if ($UiLaunched)
+{
+    $MessageBody = "Status: File System Timeline Creation completed.`n`nPress CTRL + D to shutdown DuckDB UI."
+}
+else
+{
+    $MessageBody = "Status: File System Timeline Creation completed.`n`nDuckDB UI was not launched (extension not available)."
+}
+
 $MessageTitle = "Get-NetScalerTimeline.ps1 (https://lethal-forensics.com/)"
 $ButtonType = "OK"
 $MessageIcon = "Information"
@@ -1123,8 +1254,8 @@ if ($Result -eq "OK" )
 # SIG # Begin signature block
 # MIInawYJKoZIhvcNAQcCoIInXDCCJ1gCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQU7tDKQWsV90B2NBc/+LkZwrEp
-# 676ggiCkMIIGGjCCBAKgAwIBAgIQYh1tDFIBnjuQeRUgiSEcCjANBgkqhkiG9w0B
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUaGd524yxZtnrL0NHUP0Q6wQJ
+# 9FOggiCkMIIGGjCCBAKgAwIBAgIQYh1tDFIBnjuQeRUgiSEcCjANBgkqhkiG9w0B
 # AQwFADBWMQswCQYDVQQGEwJHQjEYMBYGA1UEChMPU2VjdGlnbyBMaW1pdGVkMS0w
 # KwYDVQQDEyRTZWN0aWdvIFB1YmxpYyBDb2RlIFNpZ25pbmcgUm9vdCBSNDYwHhcN
 # MjEwMzIyMDAwMDAwWhcNMzYwMzIxMjM1OTU5WjBUMQswCQYDVQQGEwJHQjEYMBYG
@@ -1303,33 +1434,33 @@ if ($Result -eq "OK" )
 # aWduaW5nIENBIFIzNgIRAIxBnpO/K86siAYoO3YZvTwwCQYFKw4DAhoFAKB4MBgG
 # CisGAQQBgjcCAQwxCjAIoAKAAKECgAAwGQYJKoZIhvcNAQkDMQwGCisGAQQBgjcC
 # AQQwHAYKKwYBBAGCNwIBCzEOMAwGCisGAQQBgjcCARUwIwYJKoZIhvcNAQkEMRYE
-# FA/OPNyUpzv7BTGKkXQMxqWMGnEsMA0GCSqGSIb3DQEBAQUABIICACVMCx0M/6vA
-# K63NQI8HLNUXhni8fY5GmYqkBtPD0/fi0vNYfOFUjOEwsrJK54Mr3ZXg120VBMTW
-# L4aYaNWdhjG6SPZxXImgoQJiT1IC5soQ5JcrJ4oMKhJTxFhlp9mmQs1ovKMnJnXz
-# VrG+GEGNmDSnj7eZv/SquYy+Gu5GBD9MjqCN9vmZvodZk5QCpPNs7UQ/HMbOyvIQ
-# UKSC+lAiWrwdD0+nnPdBFbmo8PVbGG41WWAVN8z79x2hKjx8pYwA+dypsqDwQhZd
-# lTgJUSdQkhOEClxJfYmDh6MwNx0ZDK4A68frcOUI0cqzXsyjAtybIj3UV+dQTURm
-# umU8K1GJ2YLA7aTFZC7RHXXYDKsK8+xxvscIeSvGPUPl6XQGVeGAUECwGCWKrInq
-# 8QpQ391jUSlEunacJkjwwN/vwAkYXox5aNh3St3WENGsYCeamEhu7BxzDXxEL5jW
-# KFxmmCvPzFzNpncUDAP1ao2WJz8/6e58nhoYu+b6bGGi8R8I8HaDSYkLFfAP3iLo
-# Yc2CzzopDLf2ptNczCEROSXe+BXZoYOtDa7EkWvuBMiQ99TjPb6ev8eHyTobR/MA
-# LsztwCt2ElxjEFt5Vabb4aTB2lgoBNnFU8KbmgoAEXIWtVYIqFPgS6KW106tZFXR
-# x56paQKRmuGv/OCT4nHz+MR1dpU4FO2toYIDIzCCAx8GCSqGSIb3DQEJBjGCAxAw
+# FEGpc6mfz7GeOG8ZFuU4GUk+TCG0MA0GCSqGSIb3DQEBAQUABIICAAu+kyltoe5V
+# L5ElrXqS4B6+2eQENLV9fh+GtS8ngr/hPbEuBpNu6KZOiGPHnxFEL25mF9z9td8S
+# 98dANZKWHo419MhjW7pWxm0LXn8TLwIuBdiLttF+0jhG+Ck6N4c9DdpU2+L7NaMm
+# 7LThaowQzKUxEaL7WwPrQ+yrXXhIffwVJ9/bOxRoi950tXa63boG3Zk7cWBFnLaX
+# Dw8rqzTOOMtwM1W7BLRkpQCWPQ/zQNfbC1z0kF/E0/r25pjFoltzykNCeAvKtJi+
+# yOqyEOdFNYZ/HqumHjXgTxWqYIvjZ+x+AkIYxsj2Uz4Fxa395LYJaxnZY0EKwHdZ
+# 61QukXkL/rHA5FagocYYFYzyLo70UlxI44f11N8AqWe0yNYpBljS6J4cRUKXD21P
+# fBhIp3YadbH/yxQECRG5nn17/kfY0RQNMv32SC8PqAysEAbtbWLZ/9XRWqWRaFe9
+# LU2eAOp/tO0rnTAMiUv9fvDYHNvs2uAjaEDvoqmlh1DOhgzZdpim0k+702tLmvPU
+# tnGwSt7B92V4xZJwkf+TNvU5zsu3JopRD/hHls0uB7ueG/qOopFqUz4IGKZAVvtI
+# Vpx1ZsLcUSZ8c7p3UQU5Pbcqb0x7vFXQCsFvzb4h0qCevjkz6CYXzY0HmXiU5LNP
+# joGAcxE5eJROTASflLDs7itbzYccXOpUoYIDIzCCAx8GCSqGSIb3DQEJBjGCAxAw
 # ggMMAgEBMGowVTELMAkGA1UEBhMCR0IxGDAWBgNVBAoTD1NlY3RpZ28gTGltaXRl
 # ZDEsMCoGA1UEAxMjU2VjdGlnbyBQdWJsaWMgVGltZSBTdGFtcGluZyBDQSBSNDEC
 # EQDnTvJVsFBP+tum3/f8i6MVMA0GCWCGSAFlAwQCAgUAoHkwGAYJKoZIhvcNAQkD
-# MQsGCSqGSIb3DQEHATAcBgkqhkiG9w0BCQUxDxcNMjYxMDA0MDc0NjM4WjA/Bgkq
-# hkiG9w0BCQQxMgQwqxe4W8brlSny9/kqskj17vPQQI4KWY/FiUb1YaAgk4MkFZ3c
-# J5FWNN4lqRHpbsE3MA0GCSqGSIb3DQEBAQUABIICAJOwDZz93vIkaDsGf5xgn0yJ
-# iXlhQwpKvKG8HmmYPORcW3eUOv49lq09Lk7FI6kuOaRpu3UtY7K646QG++YqyN7W
-# T5QZ3Z8LjunryLIoLAcuTtXhWCvvrMWFSQn820fGIhe+AX6Fk9dwkX5tWKSIbsae
-# 5swENZqEg9dd9vn/P09pLn3jF/HoUrjleilcYplXWEiCp86BCNNg4vpTyF6iPdFf
-# 8UBCrdX2qhGPSPtF7pB2b7FlJ7FnEgt1TukUBW1yi4aVwuNd+agmDnnF2XkJ9FDZ
-# +NIHNQrzBxXs8IDyjFk7vIAkpO4/f2ExoN7dDCJTg6kkPiASGrTFZECj5aubU0JV
-# 7SAEtNIyiVbizcWPpDlGggPnZcWbSATqUvg3GmIGDyba89g88tFp4vaJmLMt6BB+
-# Th+u6Rt/JQdhoQZJg491ciZI6s19rF8dfC0m5XJd4NJDCnbr4/BFfxoXToj+2qiq
-# vlARh3ixdjKS+dqIx0OqoHAI7ENDjoRYxi03dvRGhwzGHQlAw5SjBGKPF0d0DVlb
-# OqF6EK3iqQTDPXtfNB9rRZh3CJedb2kBntuMtC22+KEo6Wd78rgmHIu4/vop8TRD
-# Jwf/VxcP1SjJAXpzGAg+R75RKSNhmv3mJ5UtYFVqp5jlM5oDqkR0+79vNAz8O/S/
-# lj79GvsmaRb6wsP1ci72
+# MQsGCSqGSIb3DQEHATAcBgkqhkiG9w0BCQUxDxcNMjYxMTIzMDU0MzI0WjA/Bgkq
+# hkiG9w0BCQQxMgQwq5S5RusWa21TwrXps0jOe3CzvmsLGP06iYirgBq2mlZ6KLqR
+# MRHGOFDOk/odmXEFMA0GCSqGSIb3DQEBAQUABIICACSVFK8XElCSzEvcL+VShq5O
+# 4Mjb2UOokRfLer4Y7eEDhPIWfkjpg2p8I12i2vrKrgwX3GRKdrDgJ6ghZfzVJ7EU
+# 2fsySdk3Oh8btl2igkydjqKJCuJUBoJd72xG/oUg5/xLVTo/knRJVM+HC+nU6ihe
+# 3YTOEudevi3xZP90YfbhUUWt8rYVXMKkDBZz8f1Warb+yg6TQC5McD19SJMVUYLP
+# ieZRtoou+Chx9SFdDTU1clcU77Qn53gFD7LgiRpMpeVz/4aydbbgUZnHrqWjVkhB
+# qH1Tv09TrHX0vCp1mQNn3ZgNcu6mhuZv9vT9wiEeRw9+Lrmsr7k4rEkPMSg1g56o
+# CBr+JakYcZTcNU+9Krz2vcieQFIqfrM1unpmnFP7zYSEAISXoVjzOJe3StawuCSA
+# fGB0tvLAoPurbYAdPT/JJAai0tENrxu9sL9n8eZdGV1AU/johpS7rN4JQlTCbNNR
+# QAeebAe90IJQ99X9U9J1N69HJImBNFTASMsU0dK0H3koi8c5F7AgRTlJRwpBVFmy
+# GLZRQ5MWiKiNVUPvPMW2gGZoDY1UAY5IWcZVCU4PoqbaYS1CXHX/yGtOcKRGsBi9
+# 4KE/r4bc8SNg/uo2ekD/zWsF9SA6XIkBZS7/DslQ+yG0NZ0CN1btDfdVRieElTHv
+# GKiB3Rue8fi7sZzIPT69
 # SIG # End signature block

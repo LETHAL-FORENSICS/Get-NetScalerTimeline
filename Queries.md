@@ -159,7 +159,7 @@ ORDER BY Timestamp DESC;
 
 ```sql
 -- Title: RAM Disk Coverage Check
--- Description: Checks whether paths of the NetScaler root file system (RAM disk) exist in the image. The root file system (e.g. /etc, /netscaler, /bin) is rebuilt from the firmware at every boot and is not part of the VMDK, so all counts are expected to be 0. Artifacts like /etc/httpd.conf or web shells under /netscaler/ns_gui must be collected from the live system (e.g. UAC). A count greater than 0 means the image contains more than /flash and /var (e.g. a different disk layout), so check the partitions found by the script.
+-- Description: Checks whether paths of the NetScaler root file system (RAM disk) exist in the image. The root file system (e.g. /etc, /netscaler, /bin) is rebuilt from the firmware at every boot and is not part of the VMDK, so all counts are expected to be 0 for a VMDK. Artifacts like /etc/httpd.conf must be collected from the live system (e.g. UAC) or from a dd image of the RAM disk (/dev/md0). For a RAM disk image, counts greater than 0 are expected. For a VMDK, a count greater than 0 means the image contains more than /flash and /var (e.g. a different disk layout), so check the partitions found by the script. Note: /netscaler/ns_gui is a symbolic link to /var/netscaler/gui (persistent, part of the VMDK).
 -- Id: 37f09a48-9423-403c-9fb7-552beff3a191
 -- Author: Martin Willing
 -- Date: 2026-10-04
@@ -176,7 +176,7 @@ ORDER BY p;
 
 ```sql
 -- Title: NetScaler Boot Persistence (Startup Scripts)
--- Description: Lists all events for the NetScaler startup scripts rc.netscaler, nsbefore.sh and nsafter.sh under /flash/nsconfig (Newest First). These scripts run at every boot and are the main way to restore RAM disk changes after a reboot (e.g. web shells under /netscaler/ns_gui, a modified /etc/httpd.conf, a SUID /bin/sh). They often do not exist at all, so their presence alone is worth a closer look. Check new or changed scripts (ctime) and extract them for review (icat, offset of /flash, Inode). An empty result means none of the scripts exist (also not as deleted entries).
+-- Description: Lists all events for the NetScaler startup scripts rc.netscaler, nsbefore.sh and nsafter.sh under /flash/nsconfig (Newest First). These scripts run at every boot and are the main way to restore RAM disk changes after a reboot (e.g. a modified /etc/httpd.conf, a SUID /bin/sh). They often do not exist at all, so their presence alone is worth a closer look. Check new or changed scripts (ctime) and extract them for review (icat, offset of /flash, Inode). An empty result means none of the scripts exist (also not as deleted entries).
 -- Id: 67bac5ad-48b8-43d9-8989-b01fe018e44c
 -- Author: Martin Willing
 -- Date: 2026-10-04
@@ -189,7 +189,7 @@ ORDER BY Timestamp DESC;
 
 ```sql
 -- Title: Web Shell Persistence (VPN and Web GUI Paths)
--- Description: Lists all events for the critical internet-facing VPN and Web GUI paths on persistent storage (/var) in one result (Newest First): /var/netscaler/gui/vpn/scripts/linux, /var/netscaler/gui/vpns/scripts/vista, /var/netscaler/gui/vpns/scripts/mac, /var/vpn/theme, /var/vpn/themes and /var/netscaler/logon/LogonPoint/custom. Overview of the individual Web Shell Persistence queries. Check hidden files, server-side scripts, .deb/.sig files, files owned by nobody (UID 65534) and new or changed files (ctime) outside firmware upgrades. Includes the directories themselves: their mtime/ctime changes when files are added, deleted or renamed. Note: /netscaler/ns_gui is RAM disk only and NOT part of the image.
+-- Description: Lists all events for the critical internet-facing VPN and Web GUI paths on persistent storage (/var) in one result (Newest First): /var/netscaler/gui/vpn/scripts/linux, /var/netscaler/gui/vpns/scripts/vista, /var/netscaler/gui/vpns/scripts/mac, /var/vpn/theme, /var/vpn/themes and /var/netscaler/logon/LogonPoint/custom. Overview of the individual Web Shell Persistence queries. Check hidden files, server-side scripts, .deb/.sig files, files owned by nobody (UID 65534) and new or changed files (ctime) outside firmware upgrades. Includes the directories themselves: their mtime/ctime changes when files are added, deleted or renamed. Note: /netscaler/ns_gui is a symbolic link to /var/netscaler/gui, so web shells placed via /netscaler/ns_gui are persistent and covered by this query.
 -- Id: 3c6fdbe4-3ebc-43da-8de6-1b3c2211b5fd
 -- Author: Martin Willing
 -- Date: 2026-10-04
