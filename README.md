@@ -163,7 +163,7 @@ RAW file system image of the RAM disk (`/dev/md0`), incl. MD5 and SHA256 file ha
 
 ```
 Get-NetScalerTimeline\
-└── 2026-11-22T134029Z\             One subdirectory per run (UTC)
+└── <yyyy-MM-ddTHHmmssZ>\           One subdirectory per run (UTC), e.g. 2026-11-23T064401Z
     ├── Transcript.txt
     ├── mmls\                       Partition table and BSD disk label
     ├── fsstat\                     File system details per UFS partition (or offset 0 for RAW file system images)
